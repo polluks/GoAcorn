@@ -1,4 +1,4 @@
-# Applecorn for Commodore 128
+# aC=orn for Commodore 128
 # Build with ca65/ld65 (cc65 toolchain)
 #
 # Target: C128 native mode, 2 MHz, VDC 80-column only
@@ -6,7 +6,7 @@
 CA65    := ca65
 LD65    := ld65
 CFG     := applecorn.cfg
-OUT     := applecorn.prg
+OUT     := aC=orn.prg
 
 # ca65 flags: target C128 (8502 CPU)
 # 6502x enables 6502 + 65C02 + undocumented insns for compat during port

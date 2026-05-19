@@ -8,6 +8,15 @@ AUXINIT:
             LDX   #$FF
             TXS               ; Initialize VM stack to $01FF
 
+; Ensure 2 MHz clock speed
+            LDA   #FASTCLOCK
+            STA   MMU_MCR
+
+; Initialize VDC scroll offset to 0
+            LDA   #0
+            STA   SCROLL_OFFSET_L
+            STA   SCROLL_OFFSET_H
+
 ; Set up VDC display for the BBC Micro text mode
 ; Use 80x25 character mode with Acorn font
             SEI

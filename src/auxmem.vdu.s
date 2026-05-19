@@ -131,12 +131,25 @@ VDU_LF:
             CLC
             ADC   #80
             STA   CURSOR_L
-            BCC   @DONE
+            BCC   @CHK
             INC   CURSOR_H
+@CHK:
             LDA   CURSOR_H
-            CMP   #25
+            CMP   #$07
             BCC   @DONE
+            BNE   @SCROLL
+            LDA   CURSOR_L
+            CMP   #$D0
+            BCC   @DONE
+@SCROLL:
             JSR   VDC_SCROLL
+            LDA   CURSOR_L
+            SEC
+            SBC   #80
+            STA   CURSOR_L
+            LDA   CURSOR_H
+            SBC   #0
+            STA   CURSOR_H
 @DONE:
             RTS
 
@@ -151,11 +164,36 @@ VDU_UP:
             RTS
 
 VDU_CR:
+            LDA   CURSOR_L
+            PHA
             LDA   CURSOR_H
-            STA   VDC_ADDR
-@W1:        LDA   VDC_ADDR
-            BPL   @W1
-            STA   VDC_DATA
+            PHA
+            LDA   #0
+            STA   SCRATCH
+@SUBLP:
+            LDA   CURSOR_L
+            CMP   #80
+            BCC   @DONESUB
+            SBC   #80
+            STA   CURSOR_L
+            LDA   CURSOR_H
+            SBC   #0
+            STA   CURSOR_H
+            JMP   @SUBLP
+@DONESUB:
+            LDA   CURSOR_L
+            STA   SCRATCH
+            PLA
+            STA   CURSOR_H
+            PLA
+            STA   CURSOR_L
+            LDA   CURSOR_L
+            SEC
+            SBC   SCRATCH
+            STA   CURSOR_L
+            LDA   CURSOR_H
+            SBC   #0
+            STA   CURSOR_H
             RTS
 
 VDU_CRLF:
@@ -163,7 +201,7 @@ VDU_CRLF:
             JMP   VDU_LF
 
 VDU_CLS:
-; Clear VDC screen
+; Clear VDC screen and reset display start
             LDA   #VDC_R18
             STA   VDC_ADDR
 @W1:        LDA   VDC_ADDR
@@ -179,8 +217,8 @@ VDU_CLS:
             STA   VDC_ADDR
 @W3:        LDA   VDC_ADDR
             BPL   @W3
-            LDX   #>2000      ; 2000 chars (high)
-            LDY   #<2000      ; (low)
+            LDX   #>2000
+            LDY   #<2000
             LDA   #32
 @LOOP:
             STA   VDC_DATA
@@ -188,6 +226,33 @@ VDU_CLS:
             BNE   @LOOP
             DEX
             BPL   @LOOP
+; Reset display start address to 0
+            LDA   #VDC_R12
+            STA   VDC_ADDR
+@W4:        LDA   VDC_ADDR
+            BPL   @W4
+            LDA   #0
+            STA   VDC_DATA
+            LDA   #VDC_R13
+            STA   VDC_ADDR
+@W5:        LDA   VDC_ADDR
+            BPL   @W5
+            LDA   #0
+            STA   VDC_DATA
+; Clear reverse bit
+            LDA   #VDC_R24
+            STA   VDC_ADDR
+@W6:        LDA   VDC_ADDR
+            BPL   @W6
+            LDA   VDC_DATA
+            AND   #$FF - VDC_REVERSE
+            PHA
+            LDA   #VDC_R24
+            STA   VDC_ADDR
+@W7:        LDA   VDC_ADDR
+            BPL   @W7
+            PLA
+            STA   VDC_DATA
 ; Reset cursor
             LDA   #0
             STA   CURSOR_H
@@ -205,13 +270,167 @@ VDU_COLOUR:
             RTS
 
 VDC_SCROLL:
-; Scroll VDC display up by one row
-            LDA   #VDC_R24
+; Scroll VDC display up by one row using display-start manipulation
+; VDC_REVERSE bit makes video RAM wrap at 16K, avoiding data copy
+; Data is only copied back to offset 0 every ~200 scrolls
+            LDA   SCROLL_OFFSET_L
+            CLC
+            ADC   #80
+            STA   SCROLL_OFFSET_L
+            BCC   @OK
+            INC   SCROLL_OFFSET_H
+@OK:
+            CLC
+            LDA   SCROLL_OFFSET_L
+            ADC   #<2000
+            LDA   SCROLL_OFFSET_H
+            ADC   #>2000
+            CMP   #$40
+            BCC   @SETDISP
+            JSR   VDC_REWRAP
+            LDA   #0
+            STA   SCROLL_OFFSET_L
+            STA   SCROLL_OFFSET_H
+
+@SETDISP:
+            LDA   #VDC_R12
             STA   VDC_ADDR
 @W1:        LDA   VDC_ADDR
             BPL   @W1
-            LDA   #VDC_REVERSE ; Set reverse bit
+            LDA   SCROLL_OFFSET_H
             STA   VDC_DATA
+            LDA   #VDC_R13
+            STA   VDC_ADDR
+@W2:        LDA   VDC_ADDR
+            BPL   @W2
+            LDA   SCROLL_OFFSET_L
+            STA   VDC_DATA
+
+            LDA   #VDC_R24
+            STA   VDC_ADDR
+@W3:        LDA   VDC_ADDR
+            BPL   @W3
+            LDA   VDC_DATA
+            ORA   #VDC_REVERSE
+            PHA
+            LDA   #VDC_R24
+            STA   VDC_ADDR
+@W4:        LDA   VDC_ADDR
+            BPL   @W4
+            PLA
+            STA   VDC_DATA
+
+            LDA   SCROLL_OFFSET_L
+            CLC
+            ADC   #<1920
+            STA   VDC_ADDRL
+            LDA   SCROLL_OFFSET_H
+            ADC   #>1920
+            STA   VDC_ADDRH
+            JSR   VDC_SET_UADDR
+
+            LDX   #80
+            LDA   #32
+@CLR:
+            LDA   VDC_ADDR
+            BPL   @CLR
+            STA   VDC_DATA
+            DEX
+            BNE   @CLR
+            RTS
+
+VDC_REWRAP:
+; Copy 2000 bytes from scroll_offset to 0 in 256-byte blocks
+            LDA   #0
+            STA   REWRAP_BLK
+@BLK:
+            LDA   SCROLL_OFFSET_L
+            STA   VDC_ADDRL
+            LDA   SCROLL_OFFSET_H
+            CLC
+            ADC   REWRAP_BLK
+            STA   VDC_ADDRH
+            JSR   VDC_SET_UADDR
+
+            LDX   #0
+@READ:
+            LDA   VDC_ADDR
+            BPL   @READ
+            LDA   VDC_DATA
+            STA   SCROLLBUF,X
+            INX
+            BNE   @READ
+
+            LDA   #0
+            STA   VDC_ADDRL
+            LDA   REWRAP_BLK
+            STA   VDC_ADDRH
+            JSR   VDC_SET_UADDR
+
+            LDX   #0
+@WRITE:
+            LDA   VDC_ADDR
+            BPL   @WRITE
+            LDA   SCROLLBUF,X
+            STA   VDC_DATA
+            INX
+            BNE   @WRITE
+
+            INC   REWRAP_BLK
+            LDA   REWRAP_BLK
+            CMP   #7
+            BNE   @BLK
+
+            LDA   SCROLL_OFFSET_L
+            STA   VDC_ADDRL
+            LDA   SCROLL_OFFSET_H
+            CLC
+            ADC   #7
+            STA   VDC_ADDRH
+            JSR   VDC_SET_UADDR
+
+            LDX   #0
+@READ2:
+            LDA   VDC_ADDR
+            BPL   @READ2
+            LDA   VDC_DATA
+            STA   SCROLLBUF,X
+            INX
+            CPX   #208
+            BNE   @READ2
+
+            LDA   #0
+            STA   VDC_ADDRL
+            LDA   #7
+            STA   VDC_ADDRH
+            JSR   VDC_SET_UADDR
+
+            LDX   #0
+@WRITE2:
+            LDA   VDC_ADDR
+            BPL   @WRITE2
+            LDA   SCROLLBUF,X
+            STA   VDC_DATA
+            INX
+            CPX   #208
+            BNE   @WRITE2
+            RTS
+
+VDC_SET_UADDR:
+            PHA
+            LDA   #VDC_R18
+            STA   VDC_ADDR
+@W1:        LDA   VDC_ADDR
+            BPL   @W1
+            LDA   VDC_ADDRH
+            STA   VDC_DATA
+            LDA   #VDC_R19
+            STA   VDC_ADDR
+@W2:        LDA   VDC_ADDR
+            BPL   @W2
+            LDA   VDC_ADDRL
+            STA   VDC_DATA
+            PLA
             RTS
 
 ; ============================================================
@@ -222,6 +441,11 @@ CURSOR_L = $61
 VDUQUEUE = $62    ; VDU queue (4 bytes)
 VDUQIDX  = $66
 VDUSTAT  = $67
+SCRATCH       = $71
+SCROLL_OFFSET_L = $72
+SCROLL_OFFSET_H = $73
+REWRAP_BLK    = $74
+SCROLLBUF     = $0600
 
 ; OSASCI - Write character with line feed expansion
 ; Entry: A = character

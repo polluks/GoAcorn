@@ -30,6 +30,8 @@ OSFILE_LOAD:
             LDY   OSCTRL+1   ; Load address high
             JSR   LOAD
             JSR   CLRCHN
+            LDA   #FASTCLOCK
+            STA   MMU_MCR
             RTS
 
 OSFILE_SAVE:
@@ -46,6 +48,8 @@ OSFILE_SAVE:
             LDA   #$00       ; Save entire bank
             JSR   SAVE
             JSR   CLRCHN
+            LDA   #FASTCLOCK
+            STA   MMU_MCR
             RTS
 
 OSFILE_CAT:
