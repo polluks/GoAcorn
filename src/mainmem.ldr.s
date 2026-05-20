@@ -494,7 +494,7 @@ VEC_DATA_SIZE = * - VEC_DATA
 
 ; Startup message
 STARTUP_MSG:
-            .byte "aC=orn BBC Micro ROM Emu for Commodore 128",13
+            .byte "aC=orn for Commodore 128",13
             .byte "Loading BBC BASIC...",0
 
 ; ============================================================
