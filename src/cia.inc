@@ -1,0 +1,58 @@
+; CIA (6526) Complex Interface Adapter registers - Commodore 128
+
+; CIA 1: keyboard, joystick, IRQ, cassette, TOD
+CIA1_PRA   = $DC00
+CIA1_PRB   = $DC01
+CIA1_DDRA  = $DC02
+CIA1_DDRB  = $DC03
+CIA1_TAL   = $DC04
+CIA1_TAH   = $DC05
+CIA1_TBL   = $DC06
+CIA1_TBH   = $DC07
+CIA1_TOD10 = $DC08
+CIA1_TODSEC = $DC09
+CIA1_TODMIN = $DC0A
+CIA1_TODHR  = $DC0B
+CIA1_SDR   = $DC0C
+CIA1_ICR   = $DC0D
+CIA1_CRA   = $DC0E
+CIA1_CRB   = $DC0F
+
+; CIA 2: serial bus, RS-232, NMI, VIC bank
+CIA2_PRA   = $DD00
+CIA2_PRB   = $DD01
+CIA2_DDRA  = $DD02
+CIA2_DDRB  = $DD03
+CIA2_TAL   = $DD04
+CIA2_TAH   = $DD05
+CIA2_TBL   = $DD06
+CIA2_TBH   = $DD07
+CIA2_TOD10 = $DD08
+CIA2_TODSEC = $DD09
+CIA2_TODMIN = $DD0A
+CIA2_TODHR  = $DD0B
+CIA2_SDR   = $DD0C
+CIA2_ICR   = $DD0D
+CIA2_CRA   = $DD0E
+CIA2_CRB   = $DD0F
+
+; CIA control register bits
+CRA_START     = 1
+CRA_PBON      = 2
+CRA_OUTMODE   = 4
+CRA_RUNMODE   = 8
+CRA_LOAD      = $10
+CRA_SPMODE    = $80
+
+; ICR bits
+ICR_TA      = 1
+ICR_TB      = 2
+ICR_ALARM   = 4
+ICR_SP      = 8
+ICR_FLAG    = $10
+ICR_SETMASK = $80
+
+; CIA2 port A VIC bank bits (not used - VDC only)
+CIA2_ATN_OUT   = $10
+CIA2_CLK_OUT   = $08
+CIA2_DATA_OUT  = $04
