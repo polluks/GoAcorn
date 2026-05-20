@@ -23,6 +23,49 @@ SYSTEM:
             JSR   VDC_INIT
 
 ; ----------------------------------------------------------
+; Clear VDC video RAM and write startup message
+; ----------------------------------------------------------
+            LDA   #VDC_R18
+            STA   VDC_ADDR
+@WCLS1:     LDA   VDC_ADDR
+            BPL   @WCLS1
+            LDA   #0
+            STA   VDC_DATA
+            LDA   #VDC_R19
+            STA   VDC_ADDR
+@WCLS2:     LDA   VDC_ADDR
+            BPL   @WCLS2
+            STA   VDC_DATA
+            LDA   #VDC_R31
+            STA   VDC_ADDR
+@WCLS3:     LDA   VDC_ADDR
+            BPL   @WCLS3
+; Clear 2000 bytes (7 full pages of 256 + 208 extra)
+            LDX   #6
+            LDA   #32
+@CLSPAGE:
+            LDY   #0
+@CLSBYTE:
+            STA   VDC_DATA
+            DEY
+            BNE   @CLSBYTE
+            DEX
+            BPL   @CLSPAGE
+            LDY   #208
+@CLSREM:
+            STA   VDC_DATA
+            DEY
+            BNE   @CLSREM
+; Write startup message
+            LDX   #0
+@MSG:       LDA   STARTUP_MSG,X
+            BEQ   @DONEMSG
+            STA   VDC_DATA
+            INX
+            BNE   @MSG
+@DONEMSG:
+
+; ----------------------------------------------------------
 ; Switch to 2 MHz mode
 ; ----------------------------------------------------------
             LDA   #$00
@@ -54,7 +97,8 @@ SYSTEM:
 ; Switch to bank 1 VM config (I/O visible) and start ROM
 ; ----------------------------------------------------------
             LDA   #MMU_CFG_VM
-            STA   MMU_CR2
+            STA   MMU_CR2       ; Switch to bank 1 VM config
+            LDA   #1            ; A=1 for language ROM entry
             JMP   ROMAUXADDR    ; Start the BBC Micro language ROM
 
 ; ============================================================
@@ -447,6 +491,11 @@ VEC_DATA:
             .byte <$FFF4, >$FFF4, <OSRDCH, >OSRDCH   ; OSRDCH
             .byte <$FFF7, >$FFF7, <OSGBPB, >OSGBPB   ; OSGBPB
 VEC_DATA_SIZE = * - VEC_DATA
+
+; Startup message
+STARTUP_MSG:
+            .byte "aC=orn BBC Micro VM for Commodore 128",13
+            .byte "Loading BBC BASIC...",0
 
 ; ============================================================
 ; Data area

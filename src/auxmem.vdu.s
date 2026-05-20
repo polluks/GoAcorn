@@ -60,22 +60,25 @@ OSWRCH:
             RTS
 
 ; VDC_PUTCHAR - Write character to VDC at cursor position
+; The VDC uses R18/R19 (Update Address) for R31 (Data Register) access,
+; NOT R14/R15 (Cursor Position). Must set update address before writing.
 VDC_PUTCHAR:
             PHA
-            LDA   #VDC_R14    ; Cursor position high
+; Set update address to cursor position
+            LDA   #VDC_R18
             STA   VDC_ADDR
 @W1:        LDA   VDC_ADDR
             BPL   @W1
             LDA   CURSOR_H
             STA   VDC_DATA
-            LDA   #VDC_R15    ; Cursor position low
+            LDA   #VDC_R19
             STA   VDC_ADDR
 @W2:        LDA   VDC_ADDR
             BPL   @W2
             LDA   CURSOR_L
             STA   VDC_DATA
 
-; Write character at cursor
+; Write character at cursor via data register (auto-increments)
             LDA   #VDC_R31
             STA   VDC_ADDR
 @W3:        LDA   VDC_ADDR
