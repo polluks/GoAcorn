@@ -6,11 +6,10 @@
 CA65    := ca65
 LD65    := ld65
 CFG     := applecorn.cfg
-OUT     := aC=orn.prg
 
 # ca65 flags: target C128 (8502 CPU)
 # 6502x enables 6502 + 65C02 + undocumented insns for compat during port
-CA65FLAGS := -t c128 --cpu 6502x
+CA65FLAGS := -t c128 --cpu 65c02
 
 SRCDIR  := src
 INCDIR  := src
@@ -22,21 +21,35 @@ MAIN    := $(SRCDIR)/applecorn.s
 SRCS    := $(wildcard $(SRCDIR)/*.s)
 OBJS    := $(SRCDIR)/applecorn.o
 
+# Output files: loader at $2000, MOS code at $D000
+LOADER_PRG := aC=orn.prg
+MOS_PRG    := loadmos.prg
+
 .PHONY: all clean
 
-all: $(OUT)
+all: $(LOADER_PRG) $(MOS_PRG)
 
 # Assemble the main file
 $(SRCDIR)/applecorn.o: $(MAIN) $(SRCS) $(CFG)
 	$(CA65) $(CA65FLAGS) -I $(INCDIR) -o $@ $(MAIN)
 
-# Link into C128 PRG file
-$(OUT): $(OBJS) $(CFG)
-	$(LD65) -C $(CFG) -o $@ $(OBJS)
+# Link both output files from one ld65 invocation
+# ld65 outputs raw binary; add PRG headers (2-byte load address)
+$(LOADER_PRG) $(MOS_PRG): $(OBJS) $(CFG)
+	$(LD65) -C $(CFG) -o $(LOADER_PRG) $(OBJS)
+	printf '\x00\x20' | cat - $(LOADER_PRG) > $(LOADER_PRG).tmp && \
+		mv $(LOADER_PRG).tmp $(LOADER_PRG)
+	printf '\x00\xc0' | cat - $(MOS_PRG) > $(MOS_PRG).tmp && \
+		mv $(MOS_PRG).tmp $(MOS_PRG)
+
+# Update D64 disk image with built PRGs
+d64: $(LOADER_PRG) $(MOS_PRG)
+	c1541 -attach acorn.d64 -delete "aC=orn" -write $(LOADER_PRG) "aC=orn" 2>&1
+	c1541 -attach acorn.d64 -delete "loadmos" -write $(MOS_PRG) "loadmos" 2>&1
 
 # Quick test in x128 (if available)
-run: $(OUT)
-	x128 -autostartprgmode 1 -autostart $(OUT)
+run: $(LOADER_PRG) $(MOS_PRG)
+	x128 -autostartprgmode 1 -autostart $(LOADER_PRG)
 
 clean:
-	rm -f $(OBJS) $(OUT) *.o *.prg
+	rm -f $(OBJS) $(LOADER_PRG) $(MOS_PRG) *.o

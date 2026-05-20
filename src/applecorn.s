@@ -41,11 +41,17 @@ FONTADDR    = $4000
 
 ; Address in bank 1 where ROM will be loaded
 ROMAUXADDR  = $8000
+; Temp buffer in bank 0 for loading ROM before copying to bank 1
+ROM_TMP     = $3000
+; Temp buffer for MOS code before copying to bank 1 (12KB max)
+MOS_TMP     = $4000
 
 ; Address in bank 1 where the MOS emulation is located
-AUXMOS1     = $D000
-EAUXMOS1    = $F000
-AUXMOS      = $D000
+; $D000-$DFFF is I/O space (VDC, CIA, MMU), so MOS goes at $C000
+; Future expansion: $E000-$FFFF in bank 1
+AUXMOS1     = $C000
+EAUXMOS1    = $D000
+AUXMOS      = $C000
 
 ; ============================================================
 ; C128-specific hardware abstraction macros
@@ -169,7 +175,28 @@ AUXMOS      = $D000
 ; Order matters - same as original Merlin build
 ; ============================================================
 
+; --- Loader code runs at $2000 in bank 0 ---
+.segment "CODE"
+
 .include "mainmem.ldr.s"
+.include "mainmem.fsequ.s"
+.include "mainmem.menu.s"
+.include "mainmem.init.s"
+.include "mainmem.svc.s"
+.include "mainmem.hgr.s"
+.include "mainmem.shr.s"
+.include "mainmem.path.s"
+.include "mainmem.wild.s"
+.include "mainmem.lists.s"
+.include "mainmem.misc.s"
+.include "mainmem.audio.s"
+.include "mainmem.mock.s"
+.include "mainmem.mockfreq.s"
+.include "mainmem.font8.s"
+
+; --- MOS code runs at $C000 in bank 1 ---
+.segment "MOSCODE"
+
 .include "auxmem.mosequ.s"
 .include "auxmem.init.s"
 .include "auxmem.vers.s"
@@ -182,19 +209,3 @@ AUXMOS      = $D000
 .include "auxmem.chario.s"
 .include "auxmem.audio.s"
 .include "auxmem.misc.s"
-.include "mainmem.menu.s"
-.include "mainmem.fsequ.s"
-.include "mainmem.init.s"
-.include "mainmem.svc.s"
-.include "mainmem.hgr.s"
-.include "mainmem.shr.s"
-.include "mainmem.path.s"
-.include "mainmem.wild.s"
-.include "mainmem.lists.s"
-.include "mainmem.misc.s"
-.include "mainmem.audio.s"
-.include "mainmem.ensq.s"
-.include "mainmem.ensqfreq.s"
-.include "mainmem.mock.s"
-.include "mainmem.mockfreq.s"
-.include "mainmem.font8.s"

@@ -36,7 +36,9 @@ CURLIN      = $3B
 ;   $0000-$7FFF: BBC Micro user RAM (32K)
 ;   $8000-$BFFF: Acorn language ROM
 ;   $C000-$CFFF: Reserved
-;   $D000-$FFFF: Applecorn MOS emulation code
+;   $C000-$CFFF: Applecorn MOS emulation code (lower 4K)
+;   $D000-$DFFF: I/O space (VDC, CIA, MMU)
+;   $E000-$FFFF: KERNAL ROM (bank 0) / future MOS expansion (bank 1)
 
 ; C128 2MHz speed (always on - no VIC)
 FASTCLOCK    = $00

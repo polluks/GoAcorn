@@ -5,7 +5,9 @@
 ;   Bank 1 layout:
 ;     $0000-$7FFF: BBC Micro user RAM (32K)
 ;     $8000-$BFFF: Acorn language ROM
-;     $D000-$FFFF: Applecorn MOS emulation
+;     $C000-$CFFF: Applecorn MOS emulation (lower)
+;     $D000-$DFFF: I/O space (VDC, CIA, MMU)
+;     $E000-$FFFF: KERNAL ROM (bank 0) / future MOS (bank 1)
 
 ; Entry point from ProDOS-style startup
 ; On C128, this is loaded and started via the KERNAL LOAD routine
@@ -28,9 +30,10 @@ SYSTEM:
 
 ; ----------------------------------------------------------
 ; Initialize MMU for bank switching
+; KERNAL + I/O visible (needed for KERNAL calls and VDC access)
 ; ----------------------------------------------------------
-            LDA   #MMU_CFG_ALLRAM
-            STA   MMU_CR2       ; Bank 0, all RAM, no ROMs
+            LDA   #MMU_CFG_LOADER
+            STA   MMU_CR2       ; Bank 0, KERNAL+I/O visible, rest RAM
 
 ; ----------------------------------------------------------
 ; Load Acorn language ROM into bank 1 at $8000
@@ -38,7 +41,7 @@ SYSTEM:
             JSR   LOAD_LANG_ROM
 
 ; ----------------------------------------------------------
-; Load and relocate MOS emulation code into bank 1 at $D000
+; Load and relocate MOS emulation code into bank 1 at $C000
 ; ----------------------------------------------------------
             JSR   LOAD_MOS_CODE
 
@@ -48,9 +51,9 @@ SYSTEM:
             JSR   SETUP_VM
 
 ; ----------------------------------------------------------
-; Switch to bank 1 and start the language ROM
+; Switch to bank 1 VM config (I/O visible) and start ROM
 ; ----------------------------------------------------------
-            LDA   #MMU_CFG_ALLRAM1
+            LDA   #MMU_CFG_VM
             STA   MMU_CR2
             JMP   ROMAUXADDR    ; Start the BBC Micro language ROM
 
@@ -127,43 +130,56 @@ VDC_INIT_TBL:
 ; Load Acorn font into VDC character RAM
 ; ----------------------------------------------------------
 VDC_LOAD_FONT:
-; Set VDC update address to character RAM base (bank 0)
-            LDA   #0
+; Set VDC update address to character RAM base
+            LDA   #VDC_R18
             STA   VDC_ADDR
 @W1:        LDA   VDC_ADDR
             BPL   @W1
-            LDA   #$10          ; Set bit 4 = char RAM select
+            LDA   #$10          ; Bit 4 = char RAM select
             STA   VDC_DATA
-            LDA   #0
+
+            LDA   #VDC_R19
             STA   VDC_ADDR
 @W2:        LDA   VDC_ADDR
             BPL   @W2
-            STA   VDC_DATA      ; Low byte of address = 0
-
-; Copy font data to VDC character RAM
-            LDX   #0
-            LDY   #0
-@FLOOP:
-            LDA   FONT8,Y
-            STA   VDC_ADDR
-@W3:        LDA   VDC_ADDR
-            BPL   @W3
-            TXA
+            LDA   #0
             STA   VDC_DATA
-            INX
+
+; Select R31 (data register) for auto-increment writes
+            LDA   #VDC_R31
+            STA   VDC_ADDR
+
+; Copy 768 bytes of font data to VDC character RAM
+            LDY   #0
+@P0:        LDA   VDC_ADDR
+            BPL   @P0
+            LDA   FONT8,Y
+            STA   VDC_DATA
             INY
-            CPY   #0
-            BNE   @FLOOP
+            BNE   @P0
+
+@P1:        LDA   VDC_ADDR
+            BPL   @P1
+            LDA   FONT8+256,Y
+            STA   VDC_DATA
+            INY
+            BNE   @P1
+
+@P2:        LDA   VDC_ADDR
+            BPL   @P2
+            LDA   FONT8+512,Y
+            STA   VDC_DATA
+            INY
+            BNE   @P2
+
             RTS
 
 ; ============================================================
 ; Load language ROM from disk
 ; ============================================================
 LOAD_LANG_ROM:
-; Use KERNAL to load the ROM file into bank 1 at $8000
-; First, switch to bank 1 for writing
-            LDA   #MMU_CFG_ALLRAM1
-            STA   MMU_CR2
+; Load ROM into bank 0 temp buffer at ROM_TMP ($3000)
+; We stay in config 0 (KERNAL at $E000) for KERNAL calls
 
 ; Set filename
             LDA   #LANGROM_NAME_END - LANGROM_NAME
@@ -174,82 +190,263 @@ LOAD_LANG_ROM:
 ; Set logical file parameters
             LDA   #1            ; Logical file number
             LDX   #8            ; Device (disk drive)
-            LDY   #0            ; No secondary address
+            LDY   #1            ; SA=1: load at specified address, return
             JSR   SETLFS
 
-; Load file
+; Load file to temp buffer in bank 0 (KERNAL visible in config 0)
             LDA   #0            ; Load (not verify)
-            LDX   #<ROMAUXADDR  ; Load address low
-            LDY   #>ROMAUXADDR  ; Load address high
+            LDX   #<ROM_TMP     ; Temp buffer low
+            LDY   #>ROM_TMP     ; Temp buffer high
             JSR   LOAD
 
-; Restore to bank 0 for main execution
+; Copy from bank 0 temp buffer to bank 1 at $8000
+; ZP: $70 = temp byte, $71-$72 = source ptr, $73-$74 = dest ptr
+LD_TMP      = $70
+LD_SRC      = $71
+LD_DST      = $73
+
+            LDX   #64           ; 64 pages of 256 bytes = 16K
+            LDA   #<ROM_TMP
+            STA   LD_SRC
+            LDA   #>ROM_TMP
+            STA   LD_SRC+1
+            LDA   #<ROMAUXADDR
+            STA   LD_DST
+            LDA   #>ROMAUXADDR
+            STA   LD_DST+1
+
+@PAGE:
+            LDY   #0
+@BYTE:
             LDA   #MMU_CFG_ALLRAM
+            STA   MMU_CR2
+            LDA   (LD_SRC),Y   ; Read from bank 0 temp buffer
+            STA   LD_TMP
+
+            LDA   #MMU_CFG_ALLRAM1
+            STA   MMU_CR2
+            LDA   LD_TMP
+            STA   (LD_DST),Y   ; Write to bank 1
+
+            INY
+            BNE   @BYTE
+
+            INC   LD_SRC+1
+            INC   LD_DST+1
+            DEX
+            BNE   @PAGE
+
+; Restore to loader config (KERNAL + I/O visible)
+            LDA   #MMU_CFG_LOADER
             STA   MMU_CR2
             RTS
 
 LANGROM_NAME:
-            .byte "BBCBASIC.ROM"
+            .byte "BBCBASIC"
 LANGROM_NAME_END:
 
 ; ============================================================
-; Load MOS emulation code
+; Load MOS emulation code from disk
 ; ============================================================
 LOAD_MOS_CODE:
-; The MOS code is included in the binary as AUXCODE.
-; On C128, it's linked at $D000 in the binary file.
-; At runtime, we need to ensure bank 1 has the MOS code at $D000.
-; Since our binary has it embedded, we just set up bank 1 memory.
-            LDA   #MMU_CFG_ALLRAM1
-            STA   MMU_CR2
+; Load loadmos.prg into bank 0 temp buffer, then copy to bank 1 at $C000
 
-; MOS code is assembled inline - already at $D000 via linker
-; On C128, the MMU maps bank 1, so code at $D000 is accessible
+; Set filename
+            LDA   #MOS_NAME_END - MOS_NAME
+            LDX   #<MOS_NAME
+            LDY   #>MOS_NAME
+            JSR   SETNAM
+
+; Set logical file parameters
+            LDA   #2            ; Logical file number
+            LDX   #8            ; Device (disk drive)
+            LDY   #1            ; SA=1: load at specified address
+            JSR   SETLFS
+
+; Load file to temp buffer in bank 0
+            LDA   #0            ; Load (not verify)
+            LDX   #<MOS_TMP
+            LDY   #>MOS_TMP
+            JSR   LOAD
+            BCS   @LOADFAIL    ; skip copy on error
+
+; LOAD returns: A = end_lo, X = end_hi
+; Compute pages = end_hi - >MOS_TMP + (end_lo > 0 ? 1 : 0)
+            PHA                ; save end_lo
+            TXA                ; end_hi
+            SEC
+            SBC   #>MOS_TMP    ; end_hi - $40
+            TAY                ; Y = base pages
+            PLA                ; restore end_lo
+            BEQ   @COPYMOS
+            INY                ; add one page for partial
+
+; Copy pages to bank 1 at $C000 and bank 0 at $C000
+; Entry: Y = number of pages, MOS code at MOS_TMP in bank 0
+; ZP: $70 = temp, $71-$72 = source, $73-$74 = dest
+@COPYMOS:
+            TYA                ; Save page count
+            PHA
+            BEQ   @LOADFAIL
+
+; Copy to bank 1 at $C000
+            LDA   #<MOS_TMP
+            STA   LD_SRC
+            LDA   #>MOS_TMP
+            STA   LD_SRC+1
+            LDA   #<AUXMOS
+            STA   LD_DST
+            LDA   #>AUXMOS
+            STA   LD_DST+1
+            PLA
+            TAX                ; X = page count
+            TXA
+            PHA                ; Save again
+@P1:
+            LDY   #0
+@B1:
             LDA   #MMU_CFG_ALLRAM
             STA   MMU_CR2
+            LDA   (LD_SRC),Y
+            STA   LD_TMP
+            LDA   #MMU_CFG_ALLRAM1
+            STA   MMU_CR2
+            LDA   LD_TMP
+            STA   (LD_DST),Y
+            INY
+            BNE   @B1
+            INC   LD_SRC+1
+            INC   LD_DST+1
+            DEX
+            BNE   @P1
+
+; Copy to bank 0 at $C000 (needed for cross-bank KERNAL calls)
+            LDA   #<MOS_TMP
+            STA   LD_SRC
+            LDA   #>MOS_TMP
+            STA   LD_SRC+1
+            LDA   #<AUXMOS
+            STA   LD_DST
+            LDA   #>AUXMOS
+            STA   LD_DST+1
+            PLA
+            TAX                ; X = page count
+            LDA   #MMU_CFG_ALLRAM
+            STA   MMU_CR2
+@P2:
+            LDY   #0
+@B2:
+            LDA   (LD_SRC),Y
+            STA   (LD_DST),Y
+            INY
+            BNE   @B2
+            INC   LD_SRC+1
+            INC   LD_DST+1
+            DEX
+            BNE   @P2
+
+@LOADFAIL:
+            LDA   #MMU_CFG_LOADER
+            STA   MMU_CR2
             RTS
+
+MOS_NAME:
+            .byte "loadmos"
+MOS_NAME_END:
 
 ; ============================================================
 ; Set up BBC Micro VM state in bank 1
 ; ============================================================
+CLR_ADDR = $50   ; 2-byte temp address for clear loop
+
 SETUP_VM:
             LDA   #MMU_CFG_ALLRAM1
             STA   MMU_CR2
 
-; Initialize zero page for BBC Micro VM
-            LDA   #$00
-            STA   $00
-            LDX   #$FF
-            TXS               ; Set C128 stack to $01FF
-
 ; Clear BBC Micro user RAM ($0000-$7FFF in bank 1)
+            LDX   #$00
+            STX   CLR_ADDR
+            STX   CLR_ADDR+1
+@CLEAR_LOOP:
+            LDA   #0
             LDY   #0
-            TYA
-@CLEARLP:
-            STA   $0000,Y
-            STA   $0100,Y
-            STA   $0200,Y
-            STA   $0300,Y
-            STA   $0400,Y
-            STA   $0500,Y
-            STA   $0600,Y
-            STA   $0700,Y
+@CLEAR_INNER:
+            STA   (CLR_ADDR),Y
             INY
-            BNE   @CLEARLP
+            BNE   @CLEAR_INNER
+            INC   CLR_ADDR+1
+            LDA   CLR_ADDR+1
+            CMP   #$80
+            BNE   @CLEAR_LOOP
 
-; Set up vectors for BBC Micro VM
-            LDA   #<AUXMOS
-            STA   $FFFE        ; IRQ vector -> MOS
-            LDA   #>AUXMOS
-            STA   $FFFF
-            LDA   #<AUXMOS
-            STA   $FFFC        ; RESET vector -> MOS
-            LDA   #>AUXMOS+1   ; +1 for checksum byte
+; Write BBC Micro MOS dispatch table at $FFCE-$FFF7 in bank 1.
+; The language ROM at $8000 calls these fixed addresses for OS functions.
+; Each entry: JMP handler (3 bytes).
+; Data table format: target_lo, target_hi, handler_lo, handler_hi
+VEC_TEMP = $52   ; 2 bytes temp address
+
+            LDX   #0
+@VLOOP:
+; Set target address in VEC_TEMP
+            LDA   VEC_DATA,X
+            STA   VEC_TEMP
+            LDA   VEC_DATA+1,X
+            STA   VEC_TEMP+1
+; Write JMP at target
+            LDA   #$4C
+            LDY   #0
+            STA   (VEC_TEMP),Y
+; Write handler address low
+            LDA   VEC_DATA+2,X
+            INY
+            STA   (VEC_TEMP),Y
+; Write handler address high
+            LDA   VEC_DATA+3,X
+            INY
+            STA   (VEC_TEMP),Y
+; Next entry (4 bytes per entry)
+            INX
+            INX
+            INX
+            INX
+            CPX   #VEC_DATA_SIZE
+            BNE   @VLOOP
+
+; Set hardware vectors at $FFFA-$FFFF
+            LDA   #<AUXINIT
+            STA   $FFFC
+            LDA   #>AUXINIT
             STA   $FFFD
+            LDA   #<IRQ_HANDLER
+            STA   $FFFE
+            LDA   #>IRQ_HANDLER
+            STA   $FFFF
+; NMI vector -> AUXINIT (stub)
+            LDA   #<AUXINIT
+            STA   $FFFA
+            LDA   #>AUXINIT
+            STA   $FFFB
 
             LDA   #MMU_CFG_ALLRAM
             STA   MMU_CR2
             RTS
+
+; Vector initialization data
+; Format: target_lo, target_hi, handler_lo, handler_hi
+VEC_DATA:
+            .byte <$FFCE, >$FFCE, <OSWRCH, >OSWRCH   ; OSNWRH
+            .byte <$FFD2, >$FFD2, <OSASCI, >OSASCI   ; OSASCI
+            .byte <$FFD9, >$FFD9, <OSWRCH, >OSWRCH   ; OSWRCH
+            .byte <$FFDC, >$FFDC, <OSWORD, >OSWORD   ; OSWORD
+            .byte <$FFE0, >$FFE0, <OSBYTE, >OSBYTE   ; OSBYTE
+            .byte <$FFE3, >$FFE3, <OSBGET, >OSBGET   ; OSBGET
+            .byte <$FFE6, >$FFE6, <OSBPUT, >OSBPUT   ; OSBPUT
+            .byte <$FFE9, >$FFE9, <OSFIND, >OSFIND   ; OSFIND
+            .byte <$FFEC, >$FFEC, <OSARGS, >OSARGS   ; OSARGS
+            .byte <$FFF0, >$FFF0, <OSFILE, >OSFILE   ; OSFILE
+            .byte <$FFF4, >$FFF4, <OSRDCH, >OSRDCH   ; OSRDCH
+            .byte <$FFF7, >$FFF7, <OSGBPB, >OSGBPB   ; OSGBPB
+VEC_DATA_SIZE = * - VEC_DATA
 
 ; ============================================================
 ; Data area

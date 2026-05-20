@@ -35,9 +35,20 @@ MMU_BANK15  = $00   ; KERNAL+BASIC ROM, I/O, bank 0 (default)
 ; Bit 0: $1000-$3FFF (0=char ROM, 1=RAM)
 
 ; Useful configurations:
-MMU_CFG_ALLRAM   = $3F   ; All RAM bank 0, no ROMs, no I/O
-MMU_CFG_ALLRAM1  = $7F   ; All RAM bank 1, no ROMs, no I/O
-MMU_CFG_KERN     = $05   ; KERNAL ROM + BASIC ROM, I/O, bank 0
+; MMU CR ($FF00) bits:
+;   7: VIC bank (0=bank0, 1=bank1)
+;   6: $8000-$BFFF bank (0=bank0, 1=bank1)
+;   5: $4000-$7FFF bank (0=bank0, 1=bank1)
+;   4: $0000-$3FFF bank (0=bank0, 1=bank1)
+;   3: $C000-$FFFF bank (0=bank0, 1=bank1)
+;   2: KERNAL ROM at $E000-$FFFF (0=visible, 1=hidden)
+;   1: BASIC ROM at $8000-$BFFF (0=visible, 1=hidden)
+;   0: Char ROM at $D000-$DFFF (0=visible, 1=hidden)
+MMU_CFG_ALLRAM   = $3F   ; All RAM bank 0, no ROMs (ZP/stk from bank 1)
+MMU_CFG_ALLRAM1  = $7F   ; All RAM bank 1, no ROMs (ZP/stk from bank 1)
+MMU_CFG_LOADER   = $03   ; Bank 0 everywhere, KERNAL visible, BASIC/Char hidden
+MMU_CFG_VM       = $7F   ; Bank 1 everywhere, all ROMs hidden (for BBC VM)
+MMU_CFG_VM_B0    = $03   ; Bank 0 everywhere, KERNAL visible (for KERNAL calls)
 
 ; Mode Configuration Register (MCR)
 MCR_8502    = $00

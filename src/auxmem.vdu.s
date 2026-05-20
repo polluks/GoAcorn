@@ -434,17 +434,17 @@ VDC_SET_UADDR:
             RTS
 
 ; ============================================================
-; VDU variables
+; VDU variables - using BBC Micro VDU workspace ($D0-$DF)
 ; ============================================================
-CURSOR_H = $60
-CURSOR_L = $61
-VDUQUEUE = $62    ; VDU queue (4 bytes)
-VDUQIDX  = $66
-VDUSTAT  = $67
-SCRATCH       = $71
-SCROLL_OFFSET_L = $72
-SCROLL_OFFSET_H = $73
-REWRAP_BLK    = $74
+CURSOR_H = $D0
+CURSOR_L = $D1
+VDUQUEUE = $D2    ; VDU queue (4 bytes)
+VDUQIDX  = $D6
+VDUSTAT  = $D7
+SCRATCH       = $D8
+SCROLL_OFFSET_L = $D9
+SCROLL_OFFSET_H = $DA
+REWRAP_BLK    = $DB
 SCROLLBUF     = $0600
 
 ; OSASCI - Write character with line feed expansion
@@ -467,16 +467,30 @@ OSNEWL:
             JMP   OSWRCH
 
 ; OSRDCH - Read character from keyboard
+; Switch to KERNAL-visible config for keyboard input, then restore
 OSRDCH:
-            JSR   SCNKEY      ; KERNAL scan keyboard
-            JSR   GETIN       ; KERNAL get character
+            SEI
+            LDA   MMU_CR2
+            PHA                ; Save current bank config
+            LDA   #MMU_CFG_LOADER
+            STA   MMU_CR2      ; Switch to config 0 with KERNAL visible
+            JSR   SCNKEY       ; KERNAL scan keyboard
+            JSR   GETIN        ; KERNAL get character
             CMP   #0
-            BEQ   OSRDCH
-            CMP   #$60        ; Convert lowercase to uppercase for BBC Micro
+            BEQ   @NOKEY
+            PLA                ; We consumed the key, restore bank
+            STA   MMU_CR2
+            CLI
+            CMP   #$60         ; Convert lowercase to uppercase for BBC Micro
             BCC   @OK
             SBC   #$20
 @OK:
             PHA
-            JSR   OSWRCH      ; Echo character
+            JSR   OSWRCH       ; Echo character
             PLA
             RTS
+@NOKEY:
+            PLA                ; Restore bank and retry
+            STA   MMU_CR2
+            CLI
+            JMP   OSRDCH

@@ -174,13 +174,217 @@ CMD_INFO:
             RTS
 
 ; Command handler: LOAD
+; Syntax: *LOAD <filename> [<addr>]
 CMD_LOAD:
-            JSR   PRNOTIMPL
+            LDX   CMDLEN
+@SKIPCMD:
+            DEX
+            LDA   CMDBUF,X
+            CMP   #$20
+            BNE   @SKIPCMD
+            INX
+            JSR   EXTRACT_FN
+            LDA   HF_FNLEN
+            BEQ   @DONE
+@SKP:
+            LDA   CMDBUF,X
+            CMP   #$0D
+            BEQ   @NODEF
+            CMP   #$20
+            BNE   @HAVEADR
+            INX
+            BNE   @SKP
+@HAVEADR:
+            JSR   HEX_PARSE
+            LDA   HF_FNLEN
+            LDX   #<FILENAME_BUF
+            LDY   #>FILENAME_BUF
+            JSR   SETNAM
+            LDA   #1
+            LDX   #8
+            LDY   #1
+            JSR   SETLFS
+            LDA   #0
+            LDX   HF_ADDR
+            LDY   HF_ADDR+1
+            JSR   LOAD
+            JSR   CLRCHN
+            LDA   #FASTCLOCK
+            STA   MMU_MCR
+            RTS
+@NODEF:
+            LDA   HF_FNLEN
+            LDX   #<FILENAME_BUF
+            LDY   #>FILENAME_BUF
+            JSR   SETNAM
+            LDA   #1
+            LDX   #8
+            LDY   #0
+            JSR   SETLFS
+            LDA   #0
+            JSR   LOAD
+            JSR   CLRCHN
+            LDA   #FASTCLOCK
+            STA   MMU_MCR
+@DONE:
             RTS
 
 ; Command handler: SAVE
+; Syntax: *SAVE <filename> <start> <end>
 CMD_SAVE:
-            JSR   PRNOTIMPL
+            LDX   CMDLEN
+@SKIPCMD:
+            DEX
+            LDA   CMDBUF,X
+            CMP   #$20
+            BNE   @SKIPCMD
+            INX
+            JSR   EXTRACT_FN
+            LDA   HF_FNLEN
+            BEQ   @DONE
+@SKP1:
+            LDA   CMDBUF,X
+            CMP   #$20
+            BNE   @GOTADR1
+            INX
+            BNE   @SKP1
+@GOTADR1:
+            JSR   HEX_PARSE
+            LDA   HF_ADDR
+            STA   HF_ADDR2
+            LDA   HF_ADDR+1
+            STA   HF_ADDR2+1
+@SKP2:
+            LDA   CMDBUF,X
+            CMP   #$20
+            BNE   @GOTADR2
+            INX
+            BNE   @SKP2
+@GOTADR2:
+            JSR   HEX_PARSE
+            LDA   HF_ADDR+1
+            SEC
+            SBC   HF_ADDR2+1
+            CLC
+            ADC   #1
+            STA   HF_PAGES
+            LDA   HF_FNLEN
+            LDX   #<FILENAME_BUF
+            LDY   #>FILENAME_BUF
+            JSR   SETNAM
+            LDA   #1
+            LDX   #8
+            LDY   #1
+            JSR   SETLFS
+            LDA   HF_PAGES
+            LDX   HF_ADDR2
+            LDY   HF_ADDR2+1
+            JSR   SAVE
+            JSR   CLRCHN
+            LDA   #FASTCLOCK
+            STA   MMU_MCR
+@DONE:
+            RTS
+
+; EXTRACT_FN - Extract filename from CMDBUF at offset X
+; Copies to FILENAME_BUF, returns length in HF_FNLEN
+; Handles quoted ("...") and unquoted filenames
+; X advanced past filename
+EXTRACT_FN:
+            LDA   CMDBUF,X
+            CMP   #$22
+            BEQ   @QUOTED
+            LDY   #0
+@ULP:
+            LDA   CMDBUF,X
+            CMP   #$0D
+            BEQ   @UDONE
+            CMP   #$20
+            BEQ   @UDONE
+            STA   FILENAME_BUF,Y
+            INX
+            INY
+            CPY   #63
+            BCC   @ULP
+@UDONE:
+            STY   HF_FNLEN
+            RTS
+@QUOTED:
+            INX
+            LDY   #0
+@QLP:
+            LDA   CMDBUF,X
+            CMP   #$22
+            BEQ   @QDONE
+            CMP   #$0D
+            BEQ   @QDONE
+            STA   FILENAME_BUF,Y
+            INX
+            INY
+            CPY   #63
+            BCC   @QLP
+@QDONE:
+            INX
+            STY   HF_FNLEN
+            RTS
+
+; HEX_PARSE - Parse hex number from CMDBUF at offset X
+; Returns value in HF_ADDR (2 bytes), X advanced past digits
+HEX_PARSE:
+            LDA   #0
+            STA   HF_ADDR
+            STA   HF_ADDR+1
+@LP:
+            LDA   CMDBUF,X
+            JSR   HEX_DIGIT
+            BCS   @DONE
+            ASL   HF_ADDR
+            ROL   HF_ADDR+1
+            ASL   HF_ADDR
+            ROL   HF_ADDR+1
+            ASL   HF_ADDR
+            ROL   HF_ADDR+1
+            ASL   HF_ADDR
+            ROL   HF_ADDR+1
+            ORA   HF_ADDR
+            STA   HF_ADDR
+            INX
+            JMP   @LP
+@DONE:
+            RTS
+
+; HEX_DIGIT - Convert ASCII hex digit to value
+; Entry: A = ASCII character
+; Exit:  A = value, C=0 if valid digit, C=1 if not
+HEX_DIGIT:
+            CMP   #'0'
+            BCC   @BAD
+            CMP   #'9'+1
+            BCC   @DIGIT
+            CMP   #'A'
+            BCC   @BAD
+            CMP   #'F'+1
+            BCC   @ALPHA
+            CMP   #'a'
+            BCC   @BAD
+            CMP   #'f'+1
+            BCS   @BAD
+            SEC
+            SBC   #$57
+            CLC
+            RTS
+@ALPHA:
+            SEC
+            SBC   #$37
+            CLC
+            RTS
+@DIGIT:
+            SEC
+            SBC   #'0'
+            CLC
+            RTS
+@BAD:
+            SEC
             RTS
 
 ; Command handler: RUN

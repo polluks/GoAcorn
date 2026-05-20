@@ -111,11 +111,11 @@ IRQ_HANDLER:
             TAY
             RTI
 
-; TIME variable (BBC Micro compatible, 4 bytes at $70)
-TIME_L  = $70   ; Low byte
-TIME_H  = $71
-TIME_H2 = $72
-TIME_H3 = $73   ; High byte
+; TIME variable (BBC Micro compatible, 4 bytes in OS API workspace)
+TIME_L  = $F0   ; Low byte - using OS API ZP ($F0-$F3), safe from VDU workspace
+TIME_H  = $F1
+TIME_H2 = $F2
+TIME_H3 = $F3   ; High byte
 
 ; Stub for audio envelope update
 UPDATE_ENVELOPES:
@@ -123,6 +123,7 @@ UPDATE_ENVELOPES:
 
 ; ============================================================
 ; VDU variables and workspace (C128 VDC-specific)
+; Using BBC Micro language workspace ($50-$53), safe from VDU driver
 ; ============================================================
 VDUADDR     = $50   ; 2 bytes - VDC address pointer
 VDUBANK     = $52   ; VDC bank select
