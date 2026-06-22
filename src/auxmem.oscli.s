@@ -97,8 +97,7 @@ CMD_HELP:
             INX
             BNE   @LP
 @DONE:
-            JSR   OSNEWL
-            RTS
+            JMP   OSNEWL
 
 HELPTEXT:
             .byte "Applecorn C128 - available commands:", $0D
@@ -120,8 +119,7 @@ CMD_QUIT:
 ; Command handler: FX (call OSBYTE)
 CMD_FX:
             LDX   #2
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
 ; Command handler: CAT/DIR
 CMD_CAT:
@@ -170,8 +168,7 @@ DIRBUF      = $0801
 
 ; Command handler: INFO
 CMD_INFO:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
 ; Command handler: LOAD
 ; Syntax: *LOAD <filename> [<addr>]
@@ -389,50 +386,32 @@ HEX_DIGIT:
 
 ; Command handler: RUN
 CMD_RUN:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: EXEC
 CMD_EXEC:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: SPOOL
 CMD_SPOOL:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: TYPE
 CMD_TYPE:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: DUMP
 CMD_DUMP:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: COPY
 CMD_COPY:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: DELETE
 CMD_DELETE:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: RENAME
 CMD_RENAME:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: KEY
 CMD_KEY:
-            JSR   PRNOTIMPL
-            RTS
+            JMP   PRNOTIMPL
 
-; Command handler: FAST
 CMD_FAST:
             LDA   #$00
             STA   MMU_MCR

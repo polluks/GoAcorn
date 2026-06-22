@@ -1,0 +1,3 @@
+[submodule "ROMs/Applecorn"]
+	path = ROMs/Applecorn
+	url = https://github.com/polluks/GoAcorn

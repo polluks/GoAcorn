@@ -56,8 +56,7 @@ OSWRCH:
             PHA
             RTS
 @PRINT:
-            JSR   VDC_PUTCHAR
-            RTS
+            JMP   VDC_PUTCHAR
 
 ; VDC_PUTCHAR - Write character to VDC at cursor position
 ; The VDC uses R18/R19 (Update Address) for R31 (Data Register) access,

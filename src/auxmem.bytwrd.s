@@ -89,8 +89,7 @@ GETKEY:
             LDA   KEYTEMP
             CMP   #0
             BEQ   GETKEY
-            JSR   KEY_MAP     ; Translate PETSCII to BBC Micro code
-            RTS
+            JMP   KEY_MAP     ; Translate PETSCII to BBC Micro code
 
 ; OSWORD1 - Read character at cursor position
 ; Entry: X/Y = pointer to 2-byte block:
@@ -106,8 +105,7 @@ OSWORD1:
             INY
             LDA   (OSLPTR),Y
             STA   VDC_Y
-            JSR   VDC_READ_CHAR
-            RTS
+            JMP   VDC_READ_CHAR
 
 ; VDC_READ_CHAR - Read character from VDC at cursor
 ; Entry: VDC_X = column, VDC_Y = row

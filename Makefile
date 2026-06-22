@@ -25,7 +25,7 @@ OBJS    := $(SRCDIR)/applecorn.o
 LOADER_PRG := aC=orn.prg
 MOS_PRG    := loadmos.prg
 
-.PHONY: all clean
+.PHONY: all clean check
 
 all: $(LOADER_PRG) $(MOS_PRG)
 
@@ -53,3 +53,33 @@ run: $(LOADER_PRG) $(MOS_PRG)
 
 clean:
 	rm -f $(OBJS) $(LOADER_PRG) $(MOS_PRG) *.o
+
+check: all
+	@echo "=== Build check ==="
+	@filesize=$$(stat -c%s "$(LOADER_PRG)" 2>/dev/null || echo 0); \
+	 if [ "$$filesize" -gt 512 ]; then echo "PASS: $(LOADER_PRG) = $$filesize bytes"; \
+	 else echo "FAIL: $(LOADER_PRG) too small ($$filesize bytes)"; false; fi
+	@filesize=$$(stat -c%s "$(MOS_PRG)" 2>/dev/null || echo 0); \
+	 if [ "$$filesize" -gt 1024 ]; then echo "PASS: $(MOS_PRG) = $$filesize bytes"; \
+	 else echo "FAIL: $(MOS_PRG) too small ($$filesize bytes)"; false; fi
+	@headbytes=$$(xxd -l 2 -p "$(LOADER_PRG)" 2>/dev/null); \
+	 if [ "$$headbytes" = "0020" ]; then echo "PASS: $(LOADER_PRG) load addr = \$$2000"; \
+	 else echo "FAIL: $(LOADER_PRG) load addr is $$headbytes, expected 0020"; false; fi
+	@headbytes=$$(xxd -l 2 -p "$(MOS_PRG)" 2>/dev/null); \
+	 if [ "$$headbytes" = "00c0" ]; then echo "PASS: $(MOS_PRG) load addr = \$$C000"; \
+	 else echo "FAIL: $(MOS_PRG) load addr is $$headbytes, expected 00c0"; false; fi
+	@echo "=== Smoke test in x128 ==="
+	@if command -v x128 >/dev/null 2>&1; then \
+	 timeout 8 x128 -silent -warp -autostartprgmode 1 -autostart $(LOADER_PRG); \
+	 rc=$$?; \
+	 if [ $$rc -eq 124 ]; then \
+	   echo "PASS: x128 ran for 8s without crash"; \
+	 elif [ $$rc -eq 0 ]; then \
+	   echo "PASS: x128 exited cleanly"; \
+	 else \
+	   echo "FAIL: x128 exited with code $$rc"; false; \
+	 fi; \
+	else \
+	 echo "SKIP: x128 not found"; \
+	fi
+	@echo "=== All checks passed ==="

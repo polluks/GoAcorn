@@ -135,8 +135,7 @@ OSBYTE00:
 
 OSBYTE01:
 ; Read character from keyboard (blocking)
-            JSR   OSRDCH
-            RTS
+            JMP   OSRDCH
 
 OSBYTE02:
 ; Read shift/control keys
@@ -167,19 +166,16 @@ OSBYTE04:
 
 OSBYTE05:
 ; Read key (non-destructive, i.e. peek buffer without removing)
-            JSR   OSBYTE00
-            RTS
+            JMP   OSBYTE00
 
 OSBYTE06:
 ; Check for key press immediately
 ; Returns: A=0 if no key, key code if key waiting
-            JSR   OSBYTE00
-            RTS
+            JMP   OSBYTE00
 
 OSBYTE07:
 ; Read key with cursor control handling
-            JSR   OSRDCH
-            RTS
+            JMP   OSRDCH
 
 OSBYTE09:
 ; Read escape key flag
@@ -198,8 +194,7 @@ OSBYTE0B:
 ; Entry: Y=T (centiseconds), X=0
             TYA
             BEQ   @IMMED
-            JSR   OSBYTE83
-            RTS
+            JMP   OSBYTE83
 @IMMED:
             SEI
             LDA   MMU_CR2
@@ -358,8 +353,7 @@ OSBYTE84:
             BEQ   @IMMED
 ; TODO: implement timeout with CIA timer
 @IMMED:
-            JSR   OSBYTE83
-            RTS
+            JMP   OSBYTE83
 
 OSBYTE85:
 ; Read key (non-blocking)
@@ -438,13 +432,11 @@ OSBYTEAA:
 
 OSBYTEAB:
 ; Check for keypress with timeout
-            JSR   OSBYTE83
-            RTS
+            JMP   OSBYTE83
 
 OSBYTEAC:
 ; Read key (immediate)
-            JSR   OSBYTE85
-            RTS
+            JMP   OSBYTE85
 
 ; Keyboard buffer for OSBYTE 0C/0D
 KEYBUF = $02FF

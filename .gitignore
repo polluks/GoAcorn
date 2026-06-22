@@ -2,3 +2,10 @@
 *.prg
 *.lst
 *.map
+*.d64
+*.rom
+BASIC.ROM
+BBCBASIC
+aC=orn
+loadmos
+ROMs/

@@ -140,14 +140,12 @@ OSFIND_OPEN:
             JSR   SETLFS
             JSR   OPEN
             LDA   #2
-            JSR   CHKIN
-            RTS
+            JMP   CHKIN
 
 OSFIND_CLOSE:
             TYA
             JSR   CLOSE
-            JSR   CLRCHN
-            RTS
+            JMP   CLRCHN
 
 ; ============================================================
 ; OSBGET - Get byte from file

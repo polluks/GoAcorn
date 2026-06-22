@@ -3,11 +3,11 @@
 Allows Acorn BBC Microcomputer language ROMs to run on Commodore 128.
 Uses [VDC](https://en.wikipedia.org/wiki/MOS_Technology_8563) 80-column display at 2 MHz (no VIC-IIe).
 
-Port of [bobbimanners/Applecorn](https://github.com/bobbimanners/Applecorn) from Apple II/ProDOS to C128/CBM DOS, using ca65 assembler.
+Port of [GoAcorn](https://github.com/polluks/GoAcorn) from Apple II/ProDOS to C128/CBM DOS, using ca65 assembler.
 
 ## References
 
-- https://github.com/bobbimanners/Applecorn - Original Applecorn project (Apple II)
+- https://github.com/polluks/GoAcorn - GoAcorn (Apple II), based on Applecorn
 - https://github.com/ivanizag/bbz - BBC Basic Z
 - https://github.com/raybellis/mos120 - C128 BBC Micro MOS port reference
 - https://tobylobster.github.io/mos/mos/index.html - BBC Micro MOS API documentation
