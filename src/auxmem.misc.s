@@ -126,10 +126,11 @@ OSBYTE00:
             LDA   #MMU_CFG_LOADER
             STA   MMU_CR2
             JSR   GETIN
-            PHA
+            STA   BNKSAV
             PLA
             STA   MMU_CR2
             CLI
+            LDA   BNKSAV
             RTS
 
 OSBYTE01:
@@ -200,7 +201,17 @@ OSBYTE0B:
             JSR   OSBYTE83
             RTS
 @IMMED:
+            SEI
+            LDA   MMU_CR2
+            PHA
+            LDA   #MMU_CFG_LOADER
+            STA   MMU_CR2
             JSR   GETIN
+            STA   BNKSAV
+            PLA
+            STA   MMU_CR2
+            CLI
+            LDA   BNKSAV
             CMP   #0
             RTS
 
@@ -213,6 +224,7 @@ OSBYTE0C:
 
 OSBYTE0D:
 ; Clear keyboard buffer
+            LDA   #0
             STA   KEYBUF
             RTS
 
@@ -246,13 +258,23 @@ OSBYTE13:
 
 OSBYTE14:
 ; Check for key press (same as OSBYTE 0B with T=0)
+            SEI
+            LDA   MMU_CR2
+            PHA
+            LDA   #MMU_CFG_LOADER
+            STA   MMU_CR2
             JSR   GETIN
+            STA   BNKSAV
+            PLA
+            STA   MMU_CR2
+            CLI
+            LDA   BNKSAV
             CMP   #0
             RTS
 
 OSBYTE15:
 ; Write character to keyboard buffer
-            STA   KEYBUF
+            STX   KEYBUF
             RTS
 
 OSBYTE1E:
@@ -295,6 +317,7 @@ OSBYTE81:
             PLA
             STA   MMU_CR2      ; Restore bank config
             LDA   BNKSAV
+            JSR   KEY_MAP     ; Translate to BBC Micro code
             CLI
             AND   #$7F
             RTS
@@ -315,11 +338,11 @@ OSBYTE83:
             LDA   #MMU_CFG_LOADER
             STA   MMU_CR2
             JSR   GETIN
-            PHA
-            LDA   MMU_CR2
-            STA   MMU_CR2
+            STA   BNKSAV
             PLA
+            STA   MMU_CR2
             CLI
+            LDA   BNKSAV
             CMP   #0
             BEQ   @NOKEY
             CLC               ; C=0 for key pressed (BBC convention)
@@ -346,11 +369,11 @@ OSBYTE85:
             LDA   #MMU_CFG_LOADER
             STA   MMU_CR2
             JSR   GETIN
-            PHA
-            LDA   MMU_CR2
-            STA   MMU_CR2
+            STA   BNKSAV
             PLA
+            STA   MMU_CR2
             CLI
+            LDA   BNKSAV
             CMP   #0
             RTS
 

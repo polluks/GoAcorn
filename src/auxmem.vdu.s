@@ -110,6 +110,9 @@ VDU_BELL:
             RTS
 
 VDU_BS:
+            LDA   CURSOR_L
+            ORA   CURSOR_H
+            BEQ   @DONE
             DEC   CURSOR_L
             BPL   @DONE
             DEC   CURSOR_H
@@ -124,7 +127,7 @@ VDU_TAB:
             BCC   @NOWRAP
             INC   CURSOR_H
             LDA   CURSOR_H
-            AND   #$03        ; Max 80 columns
+            AND   #$07        ; Max 2000 bytes
             STA   CURSOR_H
 @NOWRAP:
             RTS
@@ -481,19 +484,18 @@ OSRDCH:
             JSR   GETIN        ; KERNAL get character
             CMP   #0
             BEQ   @NOKEY
-            PLA                ; We consumed the key, restore bank
+            STA   SCRATCH     ; Save key before restoring bank
+            PLA               ; Restore bank config
             STA   MMU_CR2
             CLI
-            CMP   #$60         ; Convert lowercase to uppercase for BBC Micro
-            BCC   @OK
-            SBC   #$20
-@OK:
+            LDA   SCRATCH     ; Restore key
+            JSR   KEY_MAP     ; Translate PETSCII to BBC Micro code
             PHA
-            JSR   OSWRCH       ; Echo character
+            JSR   OSWRCH      ; Echo character
             PLA
             RTS
 @NOKEY:
-            PLA                ; Restore bank and retry
+            PLA               ; Restore bank and retry
             STA   MMU_CR2
             CLI
             JMP   OSRDCH

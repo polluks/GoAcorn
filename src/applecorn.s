@@ -207,5 +207,6 @@ AUXMOS      = $C000
 .include "auxmem.oscli.s"
 .include "auxmem.bytwrd.s"
 .include "auxmem.chario.s"
+.include "auxmem.keymap.s"
 .include "auxmem.audio.s"
 .include "auxmem.misc.s"

@@ -7,7 +7,9 @@ OSWORD:
             CMP   #0
             BEQ   OSWORD0     ; Read line from keyboard
             CMP   #1
-            BEQ   OSWORD1     ; Read character at cursor
+            BNE   @DONE
+            JMP   OSWORD1     ; Read character at cursor
+@DONE:
             RTS
 
 ; OSWORD0 - Read line from keyboard into buffer
@@ -73,14 +75,21 @@ OSWORD0:
 ; GETKEY - Read a key from keyboard (no echo)
 ; Exit:  A = key code (uppercase)
 GETKEY:
+            SEI
+            LDA   MMU_CR2
+            PHA
+            LDA   #MMU_CFG_LOADER
+            STA   MMU_CR2
             JSR   SCNKEY
             JSR   GETIN
+            STA   KEYTEMP
+            PLA
+            STA   MMU_CR2
+            CLI
+            LDA   KEYTEMP
             CMP   #0
             BEQ   GETKEY
-            CMP   #$60
-            BCC   @OK
-            SBC   #$20
-@OK:
+            JSR   KEY_MAP     ; Translate PETSCII to BBC Micro code
             RTS
 
 ; OSWORD1 - Read character at cursor position
@@ -165,6 +174,7 @@ MUL80:
             RTS
 
 ; Zero-page temporaries
+KEYTEMP     = $B0
 VDC_TEMP    = $69
 VDC_ADDRH   = $6A
 VDC_ADDRL   = $6B
