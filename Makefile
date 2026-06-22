@@ -8,8 +8,7 @@ LD65    := ld65
 CFG     := applecorn.cfg
 
 # ca65 flags: target C128 (8502 CPU)
-# 6502x enables 6502 + 65C02 + undocumented insns for compat during port
-CA65FLAGS := -t c128 --cpu 65c02
+CA65FLAGS := -t c128 --cpu 6502
 
 SRCDIR  := src
 INCDIR  := src

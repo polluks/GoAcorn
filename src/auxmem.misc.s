@@ -143,7 +143,7 @@ OSBYTE02:
 ; C128: check CIA1 port A for shift/ctrl
             LDA   CIA1_PRA
             LDX   #0
-            BIT   #$04         ; Shift lock?
+            AND   #$04         ; Shift lock?
             BEQ   @NORMAL
 ; TODO: Full keyboard state reading
 @NORMAL:
